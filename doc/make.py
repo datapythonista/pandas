@@ -1,438 +1,415 @@
 #!/usr/bin/env python
-
 """
 Python script for building documentation.
 
 To build the docs you must have all optional dependencies for pandas
 installed. See the installation instructions for a list of these.
 
-<del>Note: currently latex builds do not work because of table formats that are not
-supported in the latex generation.</del>
+<del>Note: currently latex builds do not work because of table formats that
+are not supported in the latex generation.</del>
 
-2014-01-30: Latex has some issues but 'latex_forced' works ok for 0.13.0-400 or so
+2014-01-30: Latex has some issues but 'latex_forced' works ok for 0.13.0-400
+or so
 
 Usage
 -----
-python make.py clean
-python make.py html
+    $ python make.py clean
+    $ python make.py html
 """
-from __future__ import print_function
-
-import io
-import glob  # noqa
+import sys
 import os
 import shutil
-import sys
-from contextlib import contextmanager
-
-import sphinx  # noqa
+import subprocess
 import argparse
-import jinja2  # noqa
-
-os.environ['PYTHONPATH'] = '..'
-
-SPHINX_BUILD = 'sphinxbuild'
-
-
-def _process_user(user):
-    if user is None or user is False:
-        user = ''
-    else:
-        user = user + '@'
-    return user
+import base64
+import smtplib
+from email.MIMEText import MIMEText
+import jinja2
 
 
-def upload_dev(user=None):
-    'push a copy to the pydata dev directory'
-    user = _process_user(user)
-    if os.system('cd build/html; rsync -avz . {0}pandas.pydata.org'
-                 ':/usr/share/nginx/pandas/pandas-docs/dev/ -essh'.format(user)):
-        raise SystemExit('Upload to Pydata Dev failed')
+DOC_PATH = os.path.dirname(os.path.abspath(__file__))
+SOURCE_PATH = os.path.join(DOC_PATH, 'source')
+BUILD_PATH = os.path.join(DOC_PATH, 'build')
+BUILD_DIRS = ['doctrees', 'html', 'latex', 'plots', '_static', '_templates']
+SERVER_HOST = 'pandas.pydata.org'
+SERVER_BASE_PATH = '/usr/share/nginx/pandas/pandas-docs'
 
 
-def upload_dev_pdf(user=None):
-    'push a copy to the pydata dev directory'
-    user = _process_user(user)
-    if os.system('cd build/latex; scp pandas.pdf {0}pandas.pydata.org'
-                 ':/usr/share/nginx/pandas/pandas-docs/dev/'.format(user)):
-        raise SystemExit('PDF upload to Pydata Dev failed')
+def _generate_index(include_api, include_notebooks, single_doc=None):
+    """Create index.rst file with the specified sections.
+
+    Parameters
+    ----------
+    include_api : bool
+        Whether API documentation will be built.
+    include_notebooks : bool
+        Whether .ipynb will be included in the documentation. Requires
+        nbconvert and pandoc installed.
+    single_doc : str or None
+        If provided, this single documentation page will be generated.
+    """
+    def _can_handle_notebooks():
+        try:
+            import nbconvert
+        except ImportError:
+            return False
+        else:
+            try:
+                nbconvert.utils.pandoc.get_pandoc_version()
+            except nbconvert.utils.pandoc.PandocMissing:
+                return False
+        return True
+
+    if single_doc is not None:
+        single_doc = os.path.basename(single_doc).splitext()[0]
+        include_api = False
+        include_notebooks = False
+    if include_notebooks and not _can_handle_notebooks():
+        raise ImportError('option --include-notebooks used, '
+                          'but nbconvert or pandoc are not installed')
+
+    with open(os.path.join(SOURCE_PATH, 'index.rst.template')) as f:
+        t = jinja2.Template(f.read())
+
+    with open(os.path.join(SOURCE_PATH, 'index.rst'), 'w') as f:
+        f.write(t.render(include_api=include_api,
+                         include_notebooks=include_notebooks,
+                         single_doc=single_doc))
 
 
-def upload_stable(user=None):
-    'push a copy to the pydata stable directory'
-    user = _process_user(user)
-    if os.system('cd build/html; rsync -avz . {0}pandas.pydata.org'
-                 ':/usr/share/nginx/pandas/pandas-docs/stable/ -essh'.format(user)):
-        raise SystemExit('Upload to stable failed')
+class DocTools:
+    """Class to wrap the different commands of this script.
 
+    All public methods of this class can be called as parameters of the
+    script.
+    """
+    num_jobs = 1
+    user = None
+    version = None
 
-def upload_stable_pdf(user=None):
-    'push a copy to the pydata dev directory'
-    user = _process_user(user)
-    if os.system('cd build/latex; scp pandas.pdf {0}pandas.pydata.org'
-                 ':/usr/share/nginx/pandas/pandas-docs/stable/'.format(user)):
-        raise SystemExit('PDF upload to stable failed')
+    @staticmethod
+    def _create_build_structure():
+        """Create directories required to build documentation."""
+        for dirname in BUILD_DIRS:
+            try:
+                os.makedirs(os.path.join(BUILD_PATH, dirname))
+            except OSError:
+                pass
 
+    @staticmethod
+    def _run_os(*args):
+        """Execute a command as a OS terminal.
 
-def upload_prev(ver, doc_root='./', user=None):
-    'push a copy of older release to appropriate version directory'
-    user = _process_user(user)
-    local_dir = doc_root + 'build/html'
-    remote_dir = '/usr/share/nginx/pandas/pandas-docs/version/%s/' % ver
-    cmd = 'cd %s; rsync -avz . %spandas.pydata.org:%s -essh'
-    cmd = cmd % (local_dir, user, remote_dir)
-    print(cmd)
-    if os.system(cmd):
-        raise SystemExit(
-            'Upload to %s from %s failed' % (remote_dir, local_dir))
+        Parameters
+        ----------
+        *args : list of str
+            Command and parameters to be executed
 
-    local_dir = doc_root + 'build/latex'
-    pdf_cmd = 'cd %s; scp pandas.pdf %spandas.pydata.org:%s'
-    pdf_cmd = pdf_cmd % (local_dir, user, remote_dir)
-    if os.system(pdf_cmd):
-        raise SystemExit('Upload PDF to %s from %s failed' % (ver, doc_root))
+        Examples
+        --------
+        >>> DocTools._run_os('python', '--version')
+        """
+        subprocess.check_call(args, stderr=subprocess.STDOUT)
 
-def build_pandas():
-    os.chdir('..')
-    os.system('python setup.py clean')
-    os.system('python setup.py build_ext --inplace')
-    os.chdir('doc')
+    @classmethod
+    def _sphinx_build(cls, kind):
+        """Call sphinx to build documentation.
 
-def build_prev(ver):
-    if os.system('git checkout v%s' % ver) != 1:
+        Attribute `num_jobs` from the class is used.
+
+        Parameters
+        ----------
+        kind : {'html', 'latex'}
+
+        Examples
+        --------
+        >>> DocTools.num_jobs = 4
+        >>> DocTools._sphinx_build('html')
+        """
+        if kind not in ('html', 'latex'):
+            raise ValueError('kind must be html or latex, not {}'.format(kind))
+
+        cls._run_os('sphinx-build',
+                    '-j{}'.format(cls.num_jobs),
+                    '-b{}'.format(kind),
+                    '-d{}'.format(os.path.join(BUILD_PATH,
+                                               'doctrees')),
+                    SOURCE_PATH,
+                    os.path.join(BUILD_PATH, kind))
+
+    @classmethod
+    def _upload_doc(cls, kind, version):
+        """Upload pandas documentation to the PyData server.
+
+        Parameters
+        ----------
+        kind : {'html', 'pdf'}
+            Type of documentation to upload
+        version : {'dev', 'stable'} or str
+            Environment or version where to upload the documentation
+        """
+        if kind == 'html':
+            cmd = ['rsync', '-avz', '-essh', os.path.join(BUILD_PATH, 'html')]
+        elif kind == 'latex':
+            cmd = ['scp', os.path.join(BUILD_PATH, 'latex', 'pandas.pdf')]
+        else:
+            raise ValueError(('Unknown document kind "{}". '
+                              'Must be html or latex'.format(kind)))
+        if version not in ('dev', 'stable'):
+            version = 'version/{}'.format(version)
+
+        remote_path = '{path}/{version}/'.format(path=SERVER_BASE_PATH,
+                                                 version=version)
+        cmd.append('{user}{at}{host}:{path}'.format(user=cls.user or '',
+                                                    at='@' if cls.user else '',
+                                                    host=SERVER_HOST,
+                                                    path=remote_path))
+        cls._run_os(*cmd)
+
+    @staticmethod
+    def _sendmail(step='', err_msg=None):
+        """Send an email with a succesful build message, or an error."""
+        config_dir = os.path.join(os.path.expanduser('~'),
+                                  'code',
+                                  'scripts',
+                                  'config')
+
+        with open(os.path.join(config_dir, 'credentials'), 'r') as f:
+            server_str, port, un, domain = f.read().split(',')
+        port = int(port)
+        login = un + '@' + domain + '.com'
+
+        with open(os.path.join(config_dir, 'cron_email_pwd'), 'r') as f:
+            pwd = base64.b64decode(f.read())
+
+        with open(os.path.join(config_dir, 'addresses'), 'r') as f:
+            from_name, to_name = f.read().split(',')
+
+        subject = 'DOC: {} '.format(step)
+        if err_msg is None or '[ERROR]' not in err_msg:
+            msgstr = 'Daily docs {} completed successfully'.format(step)
+            subject += 'successful'
+        else:
+            msgstr = err_msg
+            subject += 'failed'
+
+        msg = MIMEText(msgstr)
+        msg['Subject'] = subject
+        msg['From'] = from_name
+        msg['To'] = to_name
+        server = smtplib.SMTP(server_str, port)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(login, pwd)
+        try:
+            server.sendmail(from_name, to_name, msg.as_string())
+        finally:
+            server.close()
+
+    @classmethod
+    def html(cls):
+        """Build HTML documentation."""
+        cls._create_build_structure()
+        cls._sphinx_build('html')
+
+    @classmethod
+    def zip_html(cls):
+        """Compress HTML documentation into a zip file."""
+        zip_fname = os.path.join(BUILD_PATH, 'html', 'pandas.zip')
+        if os.path.exists(zip_fname):
+            os.remove(zip_fname)
+        dirname = os.path.join(BUILD_PATH, 'html')
+        fnames = os.listdir(dirname)
+        os.chdir(dirname)
+        cls._run_os('zip',
+                    zip_fname,
+                    '-r',
+                    '-q',
+                    *fnames)
+
+    @classmethod
+    def upload_dev(cls):
+        """Upload HTML development documentation to the server."""
+        cls._upload_doc(kind='html', version='dev')
+
+    @classmethod
+    def upload_stable(cls):
+        """Upload HTML stable documentation to the server."""
+        cls._upload_doc(kind='html', version='stable')
+
+    @classmethod
+    def upload_dev_pdf(cls):
+        """Upload PDF development documentation to the server."""
+        cls._upload_doc(kind='latex', version='dev')
+
+    @classmethod
+    def upload_stable_pdf(cls):
+        """Upload PDF stable documentation to the server."""
+        cls._upload_doc(kind='latex', version='stable')
+
+    @classmethod
+    def latex(cls, force=False):
+        """Build PDF documentation."""
+        cls._create_build_structure()
+        if sys.platform == 'win32':
+            sys.stderr.write('latex build has not been tested on windows\n')
+        else:
+            cls._sphinx_build('latex')
+            os.chdir(os.path.join(BUILD_PATH, 'latex'))
+            if force:
+                for i in range(3):
+                    cls._run_os('pdflatex',
+                                '-interaction=nonstopmode',
+                                'pandas.tex')
+                raise SystemExit('You should check the file '
+                                 '"build/latex/pandas.pdf" for problems.')
+            else:
+                cls._run_os('make')
+
+    @classmethod
+    def latex_forced(cls):
+        """Build PDF documentation with retries to find missing references."""
+        cls.latex(force=True)
+
+    @staticmethod
+    def clean():
+        """Clean documentation generated files."""
+        shutil.rmtree(BUILD_PATH, ignore_errors=True)
+        shutil.rmtree(os.path.join(SOURCE_PATH, 'generated'),
+                      ignore_errors=True)
+
+    @classmethod
+    def auto_dev(cls, debug=False):
+        """Build and upload HTML and PDF documentation."""
+        msg = ''
+        try:
+            step = 'clean'
+            cls.clean()
+            step = 'html'
+            cls.html()
+            step = 'upload dev'
+            cls.upload_dev()
+            if not debug:
+                cls._sendmail(step)
+            step = 'latex'
+            cls.latex()
+            step = 'upload pdf'
+            cls.upload_dev_pdf()
+            if not debug:
+                cls._sendmail(step)
+        except (Exception, SystemExit) as inst:
+            msg = str(inst) + '\n'
+            cls._sendmail(step, '[ERROR] ' + msg)
+
+    @classmethod
+    def auto_debug(cls):
+        """Build and upload HTML and PDF documentation with success emails."""
+        cls.auto_dev(debug=True)
+
+    @classmethod
+    def build_pandas(cls):
+        """Compile pandas cython extension."""
         os.chdir('..')
-        os.system('python setup.py clean')
-        os.system('python setup.py build_ext --inplace')
+        cls._run_os('python',
+                    'setup.py',
+                    'clean')
+        cls._run_os('python',
+                    'setup.py',
+                    'build_ext',
+                    '--inplace')
         os.chdir('doc')
-        os.system('python make.py clean')
-        os.system('python make.py html')
-        os.system('python make.py latex')
-        os.system('git checkout master')
 
+    @classmethod
+    def all(cls):
+        """Alias to build HTML by default."""
+        cls.html()
 
-def clean():
-    if os.path.exists('build'):
-        shutil.rmtree('build')
+    @classmethod
+    def build_previous(cls):
+        """Build a previous version of the documentation.
 
-    if os.path.exists('source/generated'):
-        shutil.rmtree('source/generated')
+        Version is specified in the `DocTools.version` attribute.
+        """
+        if cls.version is None:
+            raise ValueError('Version must be specified '
+                             'for command build_previous')
+        cls._run_os('git', 'checkout', 'c{}'.format(cls.version))
+        cls.build_pandas()
+        cls.clean()
+        cls.html()
+        cls.latex()
+        cls._run_os('git', 'checkout', 'master')
 
+    @classmethod
+    def upload_previous(cls):
+        """Upload a previous version of the documentation.
 
-@contextmanager
-def maybe_exclude_notebooks():
-    """
-    Skip building the notebooks if pandoc is not installed.
-    This assumes that nbsphinx is installed.
-    """
-    base = os.path.dirname(__file__)
-    notebooks = [os.path.join(base, 'source', nb)
-                 for nb in ['style.ipynb']]
-    contents = {}
+        Version is specified in the `DocTools.version` attribute.
+        """
+        if cls.version is None:
+            raise ValueError('Version must be specified '
+                             'for command upload_previous')
+        cls._upload_doc('html', cls.version)
+        cls._upload_doc('latex', cls.version)
 
-    def _remove_notebooks():
-        for nb in notebooks:
-            with open(nb, 'rt') as f:
-                contents[nb] = f.read()
-            os.remove(nb)
-
-    # Skip notebook conversion if
-    # 1. nbconvert isn't installed, or
-    # 2. nbconvert is installed, but pandoc isn't
-    try:
-        import nbconvert
-    except ImportError:
-        print("Warning: nbconvert not installed. Skipping notebooks.")
-        _remove_notebooks()
-    else:
-        try:
-            nbconvert.utils.pandoc.get_pandoc_version()
-        except nbconvert.utils.pandoc.PandocMissing:
-            print("Warning: Pandoc is not installed. Skipping notebooks.")
-            _remove_notebooks()
-
-    yield
-    for nb, content in contents.items():
-        with open(nb, 'wt') as f:
-            f.write(content)
-
-
-def html():
-    check_build()
-
-    with maybe_exclude_notebooks():
-        if os.system('sphinx-build -P -b html -d build/doctrees '
-                     'source build/html'):
-            raise SystemExit("Building HTML failed.")
-        try:
-            # remove stale file
-            os.remove('build/html/pandas.zip')
-        except:
-            pass
-
-
-def zip_html():
-    try:
-        print("\nZipping up HTML docs...")
-        # just in case the wonky build box doesn't have zip
-        # don't fail this.
-        os.system('cd build; rm -f html/pandas.zip; zip html/pandas.zip -r -q html/* ')
-        print("\n")
-    except:
-        pass
-
-def latex():
-    check_build()
-    if sys.platform != 'win32':
-        # LaTeX format.
-        if os.system('sphinx-build -j 2 -b latex -d build/doctrees '
-                     'source build/latex'):
-            raise SystemExit("Building LaTeX failed.")
-        # Produce pdf.
-
-        os.chdir('build/latex')
-
-        # Call the makefile produced by sphinx...
-        if os.system('make'):
-            print("Rendering LaTeX failed.")
-            print("You may still be able to get a usable PDF file by going into 'build/latex'")
-            print("and executing 'pdflatex pandas.tex' for the requisite number of passes.")
-            print("Or using the 'latex_forced' target")
-            raise SystemExit
-
-        os.chdir('../..')
-    else:
-        print('latex build has not been tested on windows')
-
-def latex_forced():
-    check_build()
-    if sys.platform != 'win32':
-        # LaTeX format.
-        if os.system('sphinx-build -j 2 -b latex -d build/doctrees '
-                     'source build/latex'):
-            raise SystemExit("Building LaTeX failed.")
-        # Produce pdf.
-
-        os.chdir('build/latex')
-
-        # Manually call pdflatex, 3 passes should ensure latex fixes up
-        # all the required cross-references and such.
-        os.system('pdflatex -interaction=nonstopmode pandas.tex')
-        os.system('pdflatex -interaction=nonstopmode pandas.tex')
-        os.system('pdflatex -interaction=nonstopmode pandas.tex')
-        raise SystemExit("You should check the file 'build/latex/pandas.pdf' for problems.")
-
-        os.chdir('../..')
-    else:
-        print('latex build has not been tested on windows')
-
-
-def check_build():
-    build_dirs = [
-        'build', 'build/doctrees', 'build/html',
-        'build/latex', 'build/plots', 'build/_static',
-        'build/_templates']
-    for d in build_dirs:
-        try:
-            os.mkdir(d)
-        except OSError:
-            pass
-
-
-def all():
-    # clean()
-    html()
-
-
-def auto_dev_build(debug=False):
-    msg = ''
-    try:
-        step = 'clean'
-        clean()
-        step = 'html'
-        html()
-        step = 'upload dev'
-        upload_dev()
-        if not debug:
-            sendmail(step)
-
-        step = 'latex'
-        latex()
-        step = 'upload pdf'
-        upload_dev_pdf()
-        if not debug:
-            sendmail(step)
-    except (Exception, SystemExit) as inst:
-        msg = str(inst) + '\n'
-        sendmail(step, '[ERROR] ' + msg)
-
-
-def sendmail(step=None, err_msg=None):
-    from_name, to_name = _get_config()
-
-    if step is None:
-        step = ''
-
-    if err_msg is None or '[ERROR]' not in err_msg:
-        msgstr = 'Daily docs %s completed successfully' % step
-        subject = "DOC: %s successful" % step
-    else:
-        msgstr = err_msg
-        subject = "DOC: %s failed" % step
-
-    import smtplib
-    from email.MIMEText import MIMEText
-    msg = MIMEText(msgstr)
-    msg['Subject'] = subject
-    msg['From'] = from_name
-    msg['To'] = to_name
-
-    server_str, port, login, pwd = _get_credentials()
-    server = smtplib.SMTP(server_str, port)
-    server.ehlo()
-    server.starttls()
-    server.ehlo()
-
-    server.login(login, pwd)
-    try:
-        server.sendmail(from_name, to_name, msg.as_string())
-    finally:
-        server.close()
-
-
-def _get_dir(subdir=None):
-    import getpass
-    USERNAME = getpass.getuser()
-    if sys.platform == 'darwin':
-        HOME = '/Users/%s' % USERNAME
-    else:
-        HOME = '/home/%s' % USERNAME
-
-    if subdir is None:
-        subdir = '/code/scripts/config'
-    conf_dir = '%s/%s' % (HOME, subdir)
-    return conf_dir
-
-
-def _get_credentials():
-    tmp_dir = _get_dir()
-    cred = '%s/credentials' % tmp_dir
-    with open(cred, 'r') as fh:
-        server, port, un, domain = fh.read().split(',')
-    port = int(port)
-    login = un + '@' + domain + '.com'
-
-    import base64
-    with open('%s/cron_email_pwd' % tmp_dir, 'r') as fh:
-        pwd = base64.b64decode(fh.read())
-
-    return server, port, login, pwd
-
-
-def _get_config():
-    tmp_dir = _get_dir()
-    with open('%s/addresses' % tmp_dir, 'r') as fh:
-        from_name, to_name = fh.read().split(',')
-    return from_name, to_name
-
-funcd = {
-    'html': html,
-    'zip_html': zip_html,
-    'upload_dev': upload_dev,
-    'upload_stable': upload_stable,
-    'upload_dev_pdf': upload_dev_pdf,
-    'upload_stable_pdf': upload_stable_pdf,
-    'latex': latex,
-    'latex_forced': latex_forced,
-    'clean': clean,
-    'auto_dev': auto_dev_build,
-    'auto_debug': lambda: auto_dev_build(True),
-    'build_pandas': build_pandas,
-    'all': all,
-}
-
-small_docs = False
-
-# current_dir = os.getcwd()
-# os.chdir(os.path.dirname(os.path.join(current_dir, __file__)))
-
-import argparse
-argparser = argparse.ArgumentParser(description="""
-pandas documentation builder
-""".strip())
-
-# argparser.add_argument('-arg_name', '--arg_name',
-#                    metavar='label for arg help',
-#                    type=str|etc,
-#                    nargs='N|*|?|+|argparse.REMAINDER',
-#                    required=False,
-#                    #choices='abc',
-#                    help='help string',
-#                    action='store|store_true')
-
-# args = argparser.parse_args()
-
-#print args.accumulate(args.integers)
-
-def generate_index(api=True, single=False, **kwds):
-    from jinja2 import Template
-    with open("source/index.rst.template") as f:
-        t = Template(f.read())
-
-    with open("source/index.rst","w") as f:
-        f.write(t.render(api=api,single=single,**kwds))
-
-import argparse
-argparser = argparse.ArgumentParser(description="pandas documentation builder",
-                                    epilog="Targets : %s" % funcd.keys())
-
-argparser.add_argument('--no-api',
-                   default=False,
-                   help='Ommit api and autosummary',
-                   action='store_true')
-argparser.add_argument('--single',
-                   metavar='FILENAME',
-                   type=str,
-                   default=False,
-                   help='filename of section to compile, e.g. "indexing"')
-argparser.add_argument('--user',
-                   type=str,
-                   default=False,
-                   help='Username to connect to the pydata server')
 
 def main():
-    args, unknown = argparser.parse_known_args()
-    sys.argv = [sys.argv[0]] + unknown
-    if args.single:
-        args.single = os.path.basename(args.single).split(".rst")[0]
+    cmds = [method for method in dir(DocTools) if not method.startswith('_')]
+    version_cmds = [cmd for cmd in cmds if cmd.endswith('_previous')]
 
-    if 'clean' in unknown:
-        args.single=False
+    argparser = argparse.ArgumentParser(
+        description='pandas documentation builder',
+        epilog='Commands: {}'.format(','.join(cmds)))
+    argparser.add_argument('command',
+                           nargs='?',
+                           default='all',
+                           help='command to run: {}'.format(', '.join(cmds)))
+    argparser.add_argument('--no-api',
+                           default=False,
+                           help='ommit api and autosummary',
+                           action='store_true')
+    argparser.add_argument('--single',
+                           metavar='FILENAME',
+                           type=str,
+                           default=None,
+                           help=('filename of section to compile, '
+                                 'e.g. "indexing"'))
+    argparser.add_argument('--num-jobs',
+                           type=int,
+                           default=1,
+                           help='number of jobs used by sphinx-build')
+    argparser.add_argument('--user',
+                           type=str,
+                           default=None,
+                           help='username to connect to the pydata server')
+    argparser.add_argument('version',
+                           nargs='?',
+                           help='git version. Only used with: {}'.format(
+                               ', '.join(version_cmds)))
+    argparser.add_argument('--include-notebooks',
+                           default=False,
+                           help='include ipython notebooks',
+                           action='store_true')
+    argparser.add_argument('--python-path',
+                           type=str,
+                           default=os.path.join(DOC_PATH, '..'),
+                           help='path')
+    args = argparser.parse_args()
 
-    generate_index(api=not args.no_api and not args.single, single=args.single)
+    if args.command not in cmds:
+        raise ValueError('Unknown command {}. Available options: {}'.format(
+            args.command, ', '.join(cmds)))
 
-    if len(sys.argv) > 2:
-        ftype = sys.argv[1]
-        ver = sys.argv[2]
+    os.environ['PYTHONPATH'] = args.python_path
 
-        if ftype == 'build_previous':
-            build_prev(ver, user=args.user)
-        if ftype == 'upload_previous':
-            upload_prev(ver, user=args.user)
-    elif len(sys.argv) == 2:
-        for arg in sys.argv[1:]:
-            func = funcd.get(arg)
-            if func is None:
-                raise SystemExit('Do not know how to handle %s; valid args are %s' % (
-                    arg, list(funcd.keys())))
-            if args.user:
-                func(user=args.user)
-            else:
-                func()
-    else:
-        small_docs = False
-        all()
-# os.chdir(current_dir)
+    _generate_index(not args.no_api, args.include_notebooks, args.single)
+
+    DocTools.user = args.user
+    DocTools.num_jobs = args.num_jobs
+    DocTools.version = args.version
+    getattr(DocTools, args.command)()
+
 
 if __name__ == '__main__':
-    import sys
     sys.exit(main())
