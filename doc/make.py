@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import argparse
+import tempfile
 from contextlib import contextmanager
 import jinja2
 
@@ -198,6 +199,21 @@ class DocBuilder:
                      '-r',
                      '-q',
                      *fnames)
+
+    def build_single_api_doc(self, method):
+        temp_dir = tempfile.mkdtemp()
+        temp_build_dir = os.path.join(temp_dir, 'build')
+        os.mkdir(temp_build_dir)
+
+        fname = os.path.join(SOURCE_PATH,
+                             'genereated',
+                             'pandas.{}.rst'.format(method))
+        # call apidoc?
+        shutil.copy(fname, temp_dir)
+        # add a conf.py file in temp_dir
+        # run sphinx-build
+        # copy the html file
+        # remove temp dir
 
 
 def main():
