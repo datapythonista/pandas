@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import argparse
+import tempfile
 from contextlib import contextmanager
 import jinja2
 
@@ -123,7 +124,7 @@ class DocBuilder:
         """
         subprocess.check_call(args, stderr=subprocess.STDOUT)
 
-    def _sphinx_build(self, kind):
+    def _sphinx_build(self, kind, source_path=None, build_path=None):
         """Call sphinx to build documentation.
 
         Attribute `num_jobs` from the class is used.
@@ -131,6 +132,10 @@ class DocBuilder:
         Parameters
         ----------
         kind : {'html', 'latex'}
+        source_path: str or None
+            Directory with the sources to build
+        build_path: str or None
+            Target directory where built files will be generated
 
         Examples
         --------
@@ -139,13 +144,18 @@ class DocBuilder:
         if kind not in ('html', 'latex'):
             raise ValueError('kind must be html or latex, not {}'.format(kind))
 
+        if source_path is None:
+            source_path = SOURCE_PATH
+        if build_path is None:
+            build_path = os.path.join(BUILD_PATH, kind)
+
         self._run_os('sphinx-build',
                      '-j{}'.format(self.num_jobs),
                      '-b{}'.format(kind),
                      '-d{}'.format(os.path.join(BUILD_PATH,
                                                 'doctrees')),
-                     SOURCE_PATH,
-                     os.path.join(BUILD_PATH, kind))
+                     source_path,
+                     build_path)
 
     def html(self):
         """Build HTML documentation."""
@@ -198,6 +208,42 @@ class DocBuilder:
                      '-r',
                      '-q',
                      *fnames)
+
+    def html_single(self, method='pandas.DataFrame.reset_index'):
+        # TODO: call apidoc?
+        temp_dir = tempfile.mkdtemp()
+        os.mkdir(os.path.join(temp_dir, 'source'))
+        os.mkdir(os.path.join(temp_dir, 'build'))
+        symlinks = ('sphinxext',
+                    '_templates',
+                    os.path.join('source', '_static'),
+                    os.path.join('source', 'themes'))
+        for dirname in symlinks:
+            os.symlink(os.path.join(DOC_PATH, dirname),
+                       os.path.join(temp_dir, dirname),
+                       target_is_directory=True)
+        os.symlink(os.path.join(DOC_PATH, 'source', 'conf.py'),
+                   os.path.join(temp_dir, 'source', 'conf.py'),
+                   target_is_directory=False)
+        os.symlink(os.path.join(DOC_PATH, 'source', 'generated',
+                                '{}.rst'.format(method)),
+                   os.path.join(temp_dir, 'source', '{}.rst'.format(method)),
+                   target_is_directory=False)
+
+        idx_content = '.. toctree::\n\t:maxdepth: 2\n\t\n\t{}'.format(method)
+        with open(os.path.join(temp_dir, 'source', 'index.rst'), 'w') as f:
+            f.write(idx_content)
+
+        self._sphinx_build('html',
+                           os.path.join(temp_dir, 'source'),
+                           os.path.join(temp_dir, 'build'))
+
+        os.makedirs(os.path.join(BUILD_PATH, 'html', 'generated'))
+        shutil.copy(
+            os.path.join(temp_dir, 'build', '{}.html'.format(method)),
+            os.path.join(BUILD_PATH, 'html', 'generated',
+                         '{}.html'.format(method)))
+        shutil.rmtree(temp_dir)
 
 
 def main():
