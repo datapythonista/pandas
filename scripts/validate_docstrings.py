@@ -316,27 +316,23 @@ def get_api_items():
 
 def _csv_row(func_name, func_obj, section, subsection, in_api, seen={}):
     obj_type = type(func_obj).__name__
+    base_cols = [func_name, obj_type, in_api, section, subsection]
     original_callable = _to_original_callable(func_obj)
     if original_callable is None:
-        return [func_name, obj_type] + [''] * 12, ''
+        return base_cols + [''] * 9, ''
     else:
         doc = Docstring(func_name, original_callable)
         key = doc.source_file_name, doc.source_file_def_line
         shared_code = seen.get(key, '')
-        return [func_name,
-                obj_type,
-                in_api,
-                int(doc.deprecated),
-                section,
-                subsection,
-                doc.source_file_name,
-                doc.source_file_def_line,
-                doc.github_url,
-                int(bool(doc.summary)),
-                int(bool(doc.extended_summary)),
-                int(doc.correct_parameters),
-                int(bool(doc.examples)),
-                shared_code], key
+        return base_cols + [int(doc.deprecated),
+                            doc.source_file_name,
+                            doc.source_file_def_line,
+                            doc.github_url,
+                            int(bool(doc.summary)),
+                            int(bool(doc.extended_summary)),
+                            int(doc.correct_parameters),
+                            int(bool(doc.examples)),
+                            shared_code], key
 
 
 def validate_all():
@@ -344,9 +340,9 @@ def validate_all():
     cols = ('Function or method',
             'Type',
             'In API doc',
-            'Is deprecated',
             'Section',
             'Subsection',
+            'Is deprecated',
             'File',
             'Code line',
             'GitHub link',
