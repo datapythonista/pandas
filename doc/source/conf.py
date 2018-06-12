@@ -284,10 +284,11 @@ for old, new in moved_classes:
              "{new}.{method}".format(new=new, method=method))
         )
 
-html_additional_pages = {
+html_additional_pages = {'home': 'home.html'}
+html_additional_pages.update({
     'generated/' + page[0]: 'api_redirect.html'
     for page in moved_api_pages
-}
+})
 
 html_context = {
     'redirects': {old: new for old, new in moved_api_pages}

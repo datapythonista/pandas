@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+
+{% block body %}
+    <h1>pandas: powerful Python data analysis toolkit</h1>
+
+    <p>
+        pandas is an open source, BSD-licensed library providing high-performance,
+        easy-to-use data structures and data analysis tools for the Python programming language.
+    </p>
+
+    <h2>Documentation</h2>
+
+    <table class="contentstable">
+        <tr>
+            <td>
+                <p class="biglink">
+                    Getting started<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("overview") }}">Overview</a>,
+                        <a href="{{ pathto("10min") }}">10 minutes to pandas</a>,
+                        <a href="{{ pathto("tutorials") }}">Tutorials</a>,
+                        <a href="{{ pathto("cookbook") }}">Cookbook</a>,
+                        <a href="{{ pathto("dsintro") }}">Intro to data structures</a>,
+                        <a href="{{ pathto("basics") }}">Essential basic functionality</a>
+                    </span>
+                </p>
+            </td><td>
+                <p class="biglink">
+                    Installation<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("install") }}">Installation</a>,
+                        <a href="{{ pathto("release") }}">Release notes</a>,
+                        <a href="{{ pathto("whatsnew") }}">What's new</a>
+                        <a href="https://pypi.org/project/pandas">Binary installers</a>
+                    </span>
+                </p>
+            </td>
+        </tr><tr>
+            <td>
+                <p class="biglink">
+                    Contents<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("text") }}">Working with Text Data</a>,
+                        <a href="{{ pathto("options") }}">Options and Settings</a>,
+                        <a href="{{ pathto("indexing") }}">Indexing and Selecting Data</a>,
+                        <a href="{{ pathto("advanced") }}">MultiIndex / Advanced Indexing</a>,
+                        <a href="{{ pathto("computation") }}">Computational tools</a>,
+                        <a href="{{ pathto("missing_data") }}">Working with missing data</a>,
+                        <a href="{{ pathto("groupby") }}">Group By: split-apply-combine</a>,
+                        <a href="{{ pathto("merging") }}">Merge, join, and concatenate</a>,
+                        <a href="{{ pathto("reshaping") }}">Reshaping and Pivot Tables</a>,
+                        <a href="{{ pathto("timseries") }}">Time Series / Date functionality</a>,
+                        <a href="{{ pathto("timedeltas") }}">Time Deltas</a>,
+                        <a href="{{ pathto("categorical") }}">Categorical Data</a>,
+                        <a href="{{ pathto("visualization") }}">Visualization</a>,
+                        <a href="{{ pathto("style") }}">Styling</a>,
+                        <a href="{{ pathto("io") }}">IO Tools (Text, CSV, HDF5, …)</a>,
+                        <a href="{{ pathto("enhancingperf") }}">Enhancing Performance</a>,
+                        <a href="{{ pathto("sparse") }}">Sparse data structures</a>,
+                        <a href="{{ pathto("gotchas") }}">Frequently Asked Questions (FAQ)</a>
+                    </span>
+                </p>
+            </td><td>
+                <p class="biglink">
+                    API<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("api") }}">Input/Output</a>,
+                        <a href="{{ pathto("api") }}">General functions</a>,
+                        <a href="{{ pathto("api") }}">Series</a>,
+                        <a href="{{ pathto("api") }}">DataFrame</a>,
+                        <a href="{{ pathto("api") }}">Panel</a>,
+                        <a href="{{ pathto("api") }}">Index</a>,
+                        <a href="{{ pathto("api") }}">Scalars</a>,
+                        <a href="{{ pathto("api") }}">Frequencies</a>,
+                        <a href="{{ pathto("api") }}">Window</a>,
+                        <a href="{{ pathto("api") }}">GroupBy</a>,
+                        <a href="{{ pathto("api") }}">Resampling</a>,
+                        <a href="{{ pathto("api") }}">Style</a>,
+                        <a href="{{ pathto("api") }}">Plotting</a>,
+                        <a href="{{ pathto("api") }}">General utility functions</a>,
+                        <a href="{{ pathto("api") }}">Extensions</a>
+                    </span>
+                </p>
+            </td>
+        </tr><tr>
+            <td>
+                <p class="biglink">
+                    Ecosystem<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("r_interface") }}">rpy2 / R interface</a>,
+                        <a href="{{ pathto("ecosystem") }}">pandas ecosystem</a>,
+                        <a href="{{ pathto("comparison_with_r") }}">Comparison with R / R libraries</a>,
+                        <a href="{{ pathto("comparison_with_sql") }}">Comparison with SQL</a>,
+                        <a href="{{ pathto("comparison_with_sas") }}">Comparison with SAS</a>,
+                        <a href="{{ pathto("comparison_with_stata") }}">Comparison with Stata</a>
+                    </span>
+                </p>
+            </td><td>
+                <p class="biglink">
+                    Development<br/>
+                    <span class="linkdescr">
+                        <a href="{{ pathto("contributing") }}">Contributing to pandas</a>,
+                        <a href="{{ pathto("developers") }}">Developer</a>,
+                        <a href="{{ pathto("extending") }}">Extending pandas</a>,
+                        <a href="{{ pathto("internals") }}">Internals</a>
+                        <a href="http://github.com/pandas-dev/pandas">Source repository</a>
+                        <a href="https://github.com/pandas-dev/pandas/issues">Issues &amp; ideas</a>
+                        <a href="http://stackoverflow.com/questions/tagged/pandas">Q&amp;A support</a>
+                        <a href="http://groups.google.com/group/pydata">Developer mailing list</a>
+                    </span>
+                </p>
+            </td>
+        </tr>
+    </table>
+{% endblock %}
