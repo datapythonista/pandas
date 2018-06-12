@@ -1,3 +1,4 @@
+:tocdepth: 2
 .. currentmodule:: pandas
 .. _api:
 
@@ -21,6 +22,8 @@ public functions related to data types in pandas.
 
 
 .. _api.functions:
+.. _api.io:
+
 
 Input/Output
 ------------
@@ -164,6 +167,8 @@ STATA
    StataWriter.write_file
 
 .. currentmodule:: pandas
+
+.. _api.general_functions:
 
 General functions
 -----------------

@@ -19,6 +19,7 @@ import importlib
 import logging
 import warnings
 from sphinx.ext.autosummary import _import_by_name
+import sphinx_bootstrap_theme
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +188,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-html_theme = 'nature_with_gtoc'
+html_theme = 'bootstrap'
 
 # The style sheet to use for HTML and HTML Help pages. A file of that name
 # must exist either in Sphinx' static/ path, or in one of the custom paths
@@ -197,10 +198,22 @@ html_theme = 'nature_with_gtoc'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-# html_theme_options = {}
+html_theme_options = {
+    'navbar_title': '',
+    'navbar_class': 'navbar navbar-inverse',
+    'navbar_pagenav': False,
+    'navbar_sidebarrel': False,
+    'source_link_position': 'footer',
+    'navbar_links': [
+        #('pandas', 'http://pandas.pydata.org/', True),
+        #('Donate', 'http://pandas.pydata.org/donate.html', True),
+        #('NumFOCUS', 'https://www.numfocus.org/', True),
+    ],
+    'globaltoc_depth': 0,
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = ['themes']
+html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -211,7 +224,7 @@ html_theme_path = ['themes']
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-# html_logo = None
+html_logo = 'pandas_logo.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32

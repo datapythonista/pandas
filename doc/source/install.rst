@@ -1,3 +1,4 @@
+:tocdepth: 2
 .. _install:
 
 .. currentmodule:: pandas

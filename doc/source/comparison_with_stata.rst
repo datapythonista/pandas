@@ -1,3 +1,4 @@
+:tocdepth: 2
 .. currentmodule:: pandas
 .. _compare_with_stata:
 

@@ -1,3 +1,4 @@
+:tocdepth: 2
 .. _io:
 
 .. currentmodule:: pandas
