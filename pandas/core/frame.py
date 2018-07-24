@@ -1206,13 +1206,20 @@ class DataFrame(NDFrame):
 
     @classmethod
     def from_records(cls, data, index=None, exclude=None, columns=None,
-                     coerce_float=False, nrows=None):
+                     coerce_float=False, nrows=None, dtypes=None):
         """
-        Convert structured or record ndarray to DataFrame
+        Create DataFrame from a record based source.
+
+
+        This method is intended for data sources that need to be iterated.
+        The DataFrame constructor or other methods can be more efficient for
+        sources where the data is already in columnar format (e.g. a dict with
+        a numpy array for each column).
 
         Parameters
         ----------
-        data : ndarray (structured dtype), list of tuples, dict, or DataFrame
+        data : iterable of array-lik or iterable of dict
+            Data used to construct the DataFrame.
         index : string, list of fields, array-like
             Field of array to use as the index, alternately a specific set of
             input labels to use
@@ -1229,10 +1236,67 @@ class DataFrame(NDFrame):
             decimal.Decimal) to floating point, useful for SQL result sets
         nrows : int, default None
             Number of rows to read if data is an iterator
+        dtypes : list or dict, optional
+            List of types to be used in the constructed DataFrame, or dict of
+            column names to types. Types will be inferred from data if not
+            provided.
 
         Returns
         -------
-        df : DataFrame
+        DataFrame
+            DataFrame filled with the records in data.
+
+        See Also
+        --------
+        DataFrame : DataFrame constructor.
+        DataFrame.from_dict : Create a DataFrame from a dictionary.
+        DataFrame.from_csv : Create a DataFrame from a CSV file.
+
+        Notes
+        -----
+        If `nrows` and `dtypes` are provided, and `data` is a generator,
+        `from_records` will preallocate the required memory for the
+        DataFrame, and no more memory will be required. This can be
+        useful when loading into a DataFrame large volumes that require
+        almost as much memory as the one available.
+
+        Examples
+        --------
+        >>> data = [(1, 'panda'), (2, 'penguin')]
+        >>> pd.DataFrame.from_records(data)
+           0        1
+        0  1    panda
+        1  2  penguin
+
+        Column names can be provided:
+
+        >>> pd.DataFrame.from_records(data, columns=('id', 'name'))
+           id     name
+        0   1    panda
+        1   2  penguin
+
+        A column, or a list of columns can be specified to be used as
+        the index:
+
+        >>> pd.DataFrame.from_records(data, columns=('id', 'name'),
+        ...                           index='id')
+               name
+        id
+        1     panda
+        2   penguin
+
+        To construct a DataFrame with minimal memory consumption,
+        a generator can be provided, specifying `dtypes` and `nrows`:
+
+        >>> def generate_data():
+        ...     for i in range(3):
+        ...         yield {'num': i, 'half': i / 2}
+        >>> pd.DataFrame.from_records(generate_data(), nrows=3,
+        ...                           dtypes=(np.uint8, numpy.float64))
+           num  half
+        0    0   0.0
+        1    1   0.5
+        2    2   0.1
         """
 
         # Make a copy of the input columns so we can modify it
@@ -1265,6 +1329,11 @@ class DataFrame(NDFrame):
                 data = values
 
         if isinstance(data, dict):
+            warnings.warn("'from_records' support for 'dict' objects as "
+                          "the 'data' parameter is deprecated and will be "
+                          "removed in the future. Use 'DataFrame.from_dict' "
+                          "instead", FutureWarning, stacklevel=2)
+
             if columns is None:
                 columns = arr_columns = ensure_index(sorted(data))
                 arrays = [data[k] for k in columns]
