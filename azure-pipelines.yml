@@ -36,10 +36,6 @@ jobs:
           eq(variables['Build.SourceBranch'], 'refs/heads/master'))
 
   - script: |
-      pwd
-      echo $HOME
-      ls ~/.ssh/*
-      cat ~/.ssh/*.pub
       ssh-add -L
     displayName: 'Show key information'
 
