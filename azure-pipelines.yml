@@ -126,17 +126,20 @@ jobs:
       echo '##vso[task.setvariable variable=CONDA_ENV]pandas-dev'
       echo '##vso[task.setvariable variable=ENV_FILE]environment.yml'
     displayName: 'Setting environment variables'
-   - script: |
+
+  - script: |
       export PATH=$HOME/miniconda3/bin:$PATH
       sudo apt-get install -y libc6-dev-i386
       ci/setup_env.sh
     displayName: 'Setup environment and build pandas'
-   - script: |
+
+  - script: |
       export PATH=$HOME/miniconda3/bin:$PATH
       source activate pandas-dev
       doc/make.py
     displayName: 'Build documentation'
-   - script: |
+
+  - script: |
       cd doc/build/html
       git init
       touch .nojekyll
@@ -148,7 +151,8 @@ jobs:
     condition : |
       and(not(eq(variables['Build.Reason'], 'PullRequest')),
           eq(variables['Build.SourceBranch'], 'refs/heads/master'))
-   # This task to work requires next steps:
+
+  # This task to work requires next steps:
   # 1. Got to "Library > Secure files" in the azure-pipelines dashboard: https://dev.azure.com/pandas-dev/pandas/_library?itemType=SecureFiles
   # 2. Click on "+ Secure file"
   # 3. Upload the private key (the name of the file must match with the specified in "sshKeySecureFile" input below, "pandas_docs_key")
@@ -163,7 +167,8 @@ jobs:
     condition : |
       and(not(eq(variables['Build.Reason'], 'PullRequest')),
           eq(variables['Build.SourceBranch'], 'refs/heads/master'))
-   - script: |
+
+  - script: |
       cd doc/build/html
       git remote add origin git@github.com:pandas-dev/pandas-dev.github.io.git
       git push origin master -f
