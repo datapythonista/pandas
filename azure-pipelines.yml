@@ -37,10 +37,7 @@ jobs:
 
   - script: |
       ssh-add -L
-    displayName: 'Show key information'
-
-  - script: |
-      cd doc/build/html
+      cd repo
       git remote add origin git@github.com:pandas-dev/pandas-dev.github.io.git
       git push origin master -f
     displayName: 'Publish docs to GitHub pages'
