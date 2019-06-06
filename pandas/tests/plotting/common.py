@@ -512,6 +512,8 @@ def _check_plot_works(f, filterwarnings='always', **kwargs):
             with ensure_clean(return_filelike=True) as path:
                 plt.savefig(path)
         finally:
+            if 'fig' not in locals():
+                raise
             tm.close(fig)
 
         return ret

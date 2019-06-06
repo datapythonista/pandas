@@ -8,6 +8,19 @@ from pandas.core.dtypes.generic import ABCDataFrame, ABCSeries
 from pandas.core.base import PandasObject
 from pandas.core.generic import _shared_doc_kwargs, _shared_docs
 
+# Automatically registering converters was deprecated in 0.21, but
+# the deprecation warning wasn't showing until 0.24
+# This block will be eventually removed, but it's not clear when
+try:
+    import matplotlib  # noqa
+except ImportError:
+    pass
+else:
+    from pandas import get_option
+    from pandas.plotting._matplotlib.converter import register
+    if get_option('plotting.matplotlib.register_converters'):
+        register(explicit=False)
+
 df_kind = """- 'scatter' : scatter plot
         - 'hexbin' : hexbin plot"""
 series_kind = ""
@@ -398,8 +411,6 @@ def hist_series(self, by=None, ax=None, grid=True, xlabelsize=None,
         bin edges are calculated and returned. If bins is a sequence, gives
         bin edges, including left edge of first bin and right edge of last
         bin. In this case, bins is returned unmodified.
-    bins : integer, default 10
-        Number of histogram bins to be used
     `**kwds` : keywords
         To be passed to the actual plotting function
 
