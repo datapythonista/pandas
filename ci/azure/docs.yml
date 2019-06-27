@@ -12,13 +12,13 @@ jobs:
       echo '##vso[task.setvariable variable=ENV_FILE]environment.yml'
     displayName: 'Setting environment variables'
 
-  - script: |
+  - bash: |
       export PATH=$HOME/miniconda3/bin:$PATH
       sudo apt-get install -y libc6-dev-i386
       ci/setup_env.sh
     displayName: 'Setup environment and build pandas'
 
-  - script: |
+  - bash: |
       export PATH=$HOME/miniconda3/bin:$PATH
       source activate pandas-dev
       # Next we should simply have `doc/make.py --warnings-are-errors`, everything else is required because the ipython directive doesn't fail the build on errors (https://github.com/ipython/ipython/issues/11547)
@@ -27,7 +27,7 @@ jobs:
       exit $(( $SPHINX_RET + $IPY_RET ))
     displayName: 'Build documentation'
 
-  - script: |
+  - bash: |
       cd doc/build/html
       git init
       touch .nojekyll
@@ -61,7 +61,7 @@ jobs:
           eq(variables['Build.SourceBranch'], 'refs/heads/master'),
           eq('${{ parameters.name }}', 'Docs'))
 
-  - script: |
+  - bash: |
       cd doc/build/html
       git remote add origin git@github.com:pandas-dev/pandas-dev.github.io.git
       git push -f origin master
