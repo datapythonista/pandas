@@ -18,12 +18,12 @@ jobs:
 
 - template: ci/azure/docs.yml
   parameters:
-    name: Linux
+    name: Docs
     vmImage: ubuntu-16.04
 
 - template: ci/azure/docs.yml
   parameters:
-    name: Windows
+    name: Docs_Windows
     vmImage: vs2017-win2016
 
 - job: 'Checks'
