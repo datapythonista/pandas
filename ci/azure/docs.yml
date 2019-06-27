@@ -41,7 +41,7 @@ jobs:
     condition : |
       and(not(eq(variables['Build.Reason'], 'PullRequest')),
           eq(variables['Build.SourceBranch'], 'refs/heads/master'),
-          eq(${{ parameters.name }}, 'Docs'))
+          eq('${{ parameters.name }}', 'Docs'))
 
   # For `InstallSSHKey@0` to work, next steps are required:
   # 1. Generate a pair of private/public keys (i.e. `ssh-keygen -t rsa -b 4096 -C "your_email@example.com"`)
@@ -59,7 +59,7 @@ jobs:
     condition : |
       and(not(eq(variables['Build.Reason'], 'PullRequest')),
           eq(variables['Build.SourceBranch'], 'refs/heads/master'),
-          eq(${{ parameters.name }}, 'Docs'))
+          eq('${{ parameters.name }}', 'Docs'))
 
   - script: |
       cd doc/build/html
@@ -69,5 +69,5 @@ jobs:
     condition : |
       and(not(eq(variables['Build.Reason'], 'PullRequest')),
           eq(variables['Build.SourceBranch'], 'refs/heads/master'),
-          eq(${{ parameters.name }}, 'Docs'))
+          eq('${{ parameters.name }}', 'Docs'))
 
