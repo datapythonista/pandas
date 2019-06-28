@@ -12,9 +12,13 @@ jobs:
       echo '##vso[task.setvariable variable=ENV_FILE]environment.yml'
     displayName: 'Setting environment variables'
 
+  - script: |
+      sudo apt-get install -y libc6-dev-i386
+    displayName: 'Install Linux dependencies'
+    condition: eq('${{ parameters.name }}', 'Docs')
+
   - bash: |
       export PATH=$HOME/miniconda3/bin:$PATH
-      sudo apt-get install -y libc6-dev-i386
       ci/setup_env.sh
     displayName: 'Setup environment and build pandas'
 
