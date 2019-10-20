@@ -14,7 +14,18 @@ from io import StringIO
 import itertools
 import sys
 from textwrap import dedent
-from typing import FrozenSet, List, Optional, Sequence, Set, Tuple, Type, Union
+from typing import (
+    FrozenSet,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 import warnings
 
 import numpy as np
@@ -31,7 +42,11 @@ from pandas.util._decorators import (
     deprecate_kwarg,
     rewrite_axis_style_signature,
 )
-from pandas.util._validators import validate_axis_style_args, validate_bool_kwarg
+from pandas.util._validators import (
+    validate_axis_style_args,
+    validate_bool_kwarg,
+    validate_percentile,
+)
 
 from pandas.core.dtypes.cast import (
     cast_scalar_to_array,
@@ -53,7 +68,6 @@ from pandas.core.dtypes.common import (
     infer_dtype_from_object,
     is_bool_dtype,
     is_datetime64_any_dtype,
-    is_datetime64tz_dtype,
     is_dict_like,
     is_dtype_equal,
     is_extension_array_dtype,
@@ -304,7 +318,7 @@ class DataFrame(NDFrame):
     Parameters
     ----------
     data : ndarray (structured or homogeneous), Iterable, dict, or DataFrame
-        Dict can contain Series, arrays, constants, or list-like objects
+        Dict can contain Series, arrays, constants, or list-like objects.
 
         .. versionchanged:: 0.23.0
            If data is a dict, column order follows insertion-order for
@@ -316,14 +330,14 @@ class DataFrame(NDFrame):
 
     index : Index or array-like
         Index to use for resulting frame. Will default to RangeIndex if
-        no indexing information part of input data and no index provided
+        no indexing information part of input data and no index provided.
     columns : Index or array-like
         Column labels to use for resulting frame. Will default to
-        RangeIndex (0, 1, 2, ..., n) if no column labels are provided
+        RangeIndex (0, 1, 2, ..., n) if no column labels are provided.
     dtype : dtype, default None
-        Data type to force. Only a single dtype is allowed. If None, infer
+        Data type to force. Only a single dtype is allowed. If None, infer.
     copy : bool, default False
-        Copy data from inputs. Only affects DataFrame / 2d ndarray input
+        Copy data from inputs. Only affects DataFrame / 2d ndarray input.
 
     See Also
     --------
@@ -534,6 +548,13 @@ class DataFrame(NDFrame):
         Returns
         -------
         bool
+
+        See Also
+        --------
+        Index._is_homogeneous_type : Whether the object has a single
+            dtype.
+        MultiIndex._is_homogeneous_type : Whether all the levels of a
+            MultiIndex have the same dtype.
 
         Examples
         --------
@@ -850,7 +871,7 @@ class DataFrame(NDFrame):
         """
 
     @Appender(_shared_docs["items"])
-    def items(self):
+    def items(self) -> Iterable[Tuple[Hashable, Series]]:
         if self.columns.is_unique and hasattr(self, "_item_cache"):
             for k in self.columns:
                 yield k, self._get_item_cache(k)
@@ -1544,20 +1565,20 @@ class DataFrame(NDFrame):
         data : ndarray (structured dtype), list of tuples, dict, or DataFrame
         index : str, list of fields, array-like
             Field of array to use as the index, alternately a specific set of
-            input labels to use
+            input labels to use.
         exclude : sequence, default None
-            Columns or fields to exclude
+            Columns or fields to exclude.
         columns : sequence, default None
             Column names to use. If the passed data do not have names
             associated with them, this argument provides names for the
             columns. Otherwise this argument indicates the order of the columns
             in the result (any names not found in the data will become all-NA
-            columns)
+            columns).
         coerce_float : bool, default False
             Attempt to convert values of non-string, non-numeric objects (like
-            decimal.Decimal) to floating point, useful for SQL result sets
+            decimal.Decimal) to floating point, useful for SQL result sets.
         nrows : int, default None
-            Number of rows to read if data is an iterator
+            Number of rows to read if data is an iterator.
 
         Returns
         -------
@@ -2118,8 +2139,8 @@ class DataFrame(NDFrame):
             .. versionadded:: 0.24.0
 
         partition_cols : list, optional, default None
-            Column names by which to partition the dataset
-            Columns are partitioned in the order they are given
+            Column names by which to partition the dataset.
+            Columns are partitioned in the order they are given.
 
             .. versionadded:: 0.24.0
 
@@ -2196,6 +2217,7 @@ class DataFrame(NDFrame):
         border=None,
         table_id=None,
         render_links=False,
+        encoding=None,
     ):
         """
         Render a DataFrame as an HTML table.
@@ -2211,6 +2233,10 @@ class DataFrame(NDFrame):
         border : int
             A ``border=border`` attribute is included in the opening
             `<table>` tag. Default ``pd.options.display.html.border``.
+        encoding : str, default "utf-8"
+            Set character encoding
+
+            .. versionadded:: 1.0
         table_id : str, optional
             A css id is included in the opening `<table>` tag if specified.
 
@@ -2252,7 +2278,11 @@ class DataFrame(NDFrame):
         )
         # TODO: a generic formatter wld b in DataFrameFormatter
         return formatter.to_html(
-            buf=buf, classes=classes, notebook=notebook, border=border
+            buf=buf,
+            classes=classes,
+            notebook=notebook,
+            border=border,
+            encoding=encoding,
         )
 
     # ----------------------------------------------------------------------
@@ -3460,9 +3490,9 @@ class DataFrame(NDFrame):
         Parameters
         ----------
         loc : int
-            Insertion index. Must verify 0 <= loc <= len(columns)
+            Insertion index. Must verify 0 <= loc <= len(columns).
         column : str, number, or hashable object
-            label of the inserted column
+            Label of the inserted column.
         value : int, Series, or array-like
         allow_duplicates : bool, optional
         """
@@ -3681,9 +3711,9 @@ class DataFrame(NDFrame):
         Parameters
         ----------
         row_labels : sequence
-            The row labels to use for lookup
+            The row labels to use for lookup.
         col_labels : sequence
-            The column labels to use for lookup
+            The column labels to use for lookup.
 
         Returns
         -------
@@ -4770,14 +4800,14 @@ class DataFrame(NDFrame):
         ----------
         subset : column label or sequence of labels, optional
             Only consider certain columns for identifying duplicates, by
-            default use all of the columns
+            default use all of the columns.
         keep : {'first', 'last', False}, default 'first'
             Determines which duplicates (if any) to keep.
             - ``first`` : Drop duplicates except for the first occurrence.
             - ``last`` : Drop duplicates except for the last occurrence.
             - False : Drop all duplicates.
         inplace : bool, default False
-            Whether to drop duplicates in place or to return a copy
+            Whether to drop duplicates in place or to return a copy.
 
         Returns
         -------
@@ -4805,7 +4835,7 @@ class DataFrame(NDFrame):
         ----------
         subset : column label or sequence of labels, optional
             Only consider certain columns for identifying duplicates, by
-            default use all of the columns
+            default use all of the columns.
         keep : {'first', 'last', False}, default 'first'
             Determines which duplicates (if any) to mark.
 
@@ -5272,24 +5302,17 @@ class DataFrame(NDFrame):
             new_data = dispatch_fill_zeros(func, this.values, other.values, res_values)
         return this._construct_result(new_data)
 
-    def _combine_match_index(self, other, func, level=None):
-        left, right = self.align(other, join="outer", axis=0, level=level, copy=False)
-        # at this point we have `left.index.equals(right.index)`
+    def _combine_match_index(self, other, func):
+        # at this point we have `self.index.equals(other.index)`
 
-        if left._is_mixed_type or right._is_mixed_type:
+        if ops.should_series_dispatch(self, other, func):
             # operate column-wise; avoid costly object-casting in `.values`
-            new_data = ops.dispatch_to_series(left, right, func)
+            new_data = ops.dispatch_to_series(self, other, func)
         else:
             # fastpath --> operate directly on values
             with np.errstate(all="ignore"):
-                new_data = func(left.values.T, right.values).T
-        return left._construct_result(new_data)
-
-    def _combine_match_columns(self, other: Series, func, level=None):
-        left, right = self.align(other, join="outer", axis=1, level=level, copy=False)
-        # at this point we have `left.columns.equals(right.index)`
-        new_data = ops.dispatch_to_series(left, right, func, axis="columns")
-        return left._construct_result(new_data)
+                new_data = func(self.values.T, other.values).T
+        return new_data
 
     def _construct_result(self, result) -> "DataFrame":
         """
@@ -6233,9 +6256,9 @@ class DataFrame(NDFrame):
         Parameters
         ----------
         level : int, str, or list of these, default -1 (last level)
-            Level(s) of index to unstack, can pass level name
-        fill_value : int, string or dict
-            Replace NaN with this value if the unstack produces missing values
+            Level(s) of index to unstack, can pass level name.
+        fill_value : int, str or dict
+            Replace NaN with this value if the unstack produces missing values.
 
         Returns
         -------
@@ -6624,15 +6647,7 @@ class DataFrame(NDFrame):
         return super().transform(func, *args, **kwargs)
 
     def apply(
-        self,
-        func,
-        axis=0,
-        broadcast=None,
-        raw=False,
-        reduce=None,
-        result_type=None,
-        args=(),
-        **kwds
+        self, func, axis=0, raw=False, reduce=None, result_type=None, args=(), **kwds
     ):
         """
         Apply a function along an axis of the DataFrame.
@@ -6652,21 +6667,9 @@ class DataFrame(NDFrame):
 
             * 0 or 'index': apply function to each column.
             * 1 or 'columns': apply function to each row.
-        broadcast : bool, optional
-            Only relevant for aggregation functions:
-
-            * ``False`` or ``None`` : returns a Series whose length is the
-              length of the index or the number of columns (based on the
-              `axis` parameter)
-            * ``True`` : results will be broadcast to the original shape
-              of the frame, the original index and columns will be retained.
-
-            .. deprecated:: 0.23.0
-               This argument will be removed in a future version, replaced
-               by result_type='broadcast'.
 
         raw : bool, default False
-            Determines if row or column is passed as a Series or ndarry object:
+            Determines if row or column is passed as a Series or ndarray object:
 
             * ``False`` : passes each row or column as a Series to the
               function.
@@ -6674,20 +6677,6 @@ class DataFrame(NDFrame):
               instead.
               If you are just applying a NumPy reduction function this will
               achieve much better performance.
-        reduce : bool or None, default None
-            Try to apply reduction procedures. If the DataFrame is empty,
-            `apply` will use `reduce` to determine whether the result
-            should be a Series or a DataFrame. If ``reduce=None`` (the
-            default), `apply`'s return value will be guessed by calling
-            `func` on an empty Series
-            (note: while guessing, exceptions raised by `func` will be
-            ignored).
-            If ``reduce=True`` a Series will always be returned, and if
-            ``reduce=False`` a DataFrame will always be returned.
-
-            .. deprecated:: 0.23.0
-               This argument will be removed in a future version, replaced
-               by ``result_type='reduce'``.
 
         result_type : {'expand', 'reduce', 'broadcast', None}, default None
             These only act when ``axis=1`` (columns):
@@ -6724,14 +6713,6 @@ class DataFrame(NDFrame):
         DataFrame.applymap: For elementwise operations.
         DataFrame.aggregate: Only perform aggregating type operations.
         DataFrame.transform: Only perform transforming type operations.
-
-        Notes
-        -----
-        In the current implementation apply calls `func` twice on the
-        first column/row to decide whether it can take a fast or slow
-        code path. This can lead to unexpected behavior if `func` has
-        side-effects, as they will take effect twice for the first
-        column/row.
 
         Examples
         --------
@@ -6809,9 +6790,7 @@ class DataFrame(NDFrame):
             self,
             func=func,
             axis=axis,
-            broadcast=broadcast,
             raw=raw,
-            reduce=reduce,
             result_type=result_type,
             args=args,
             kwds=kwds,
@@ -7368,7 +7347,8 @@ class DataFrame(NDFrame):
             * callable: callable with input two 1d ndarrays
                 and returning a float. Note that the returned matrix from corr
                 will have 1 along the diagonals and will be symmetric
-                regardless of the callable's behavior
+                regardless of the callable's behavior.
+
                 .. versionadded:: 0.24.0
 
         min_periods : int, optional
@@ -7572,7 +7552,7 @@ class DataFrame(NDFrame):
             * kendall : Kendall Tau correlation coefficient
             * spearman : Spearman rank correlation
             * callable: callable with input two 1d ndarrays
-                and returning a float
+                and returning a float.
 
             .. versionadded:: 0.24.0
 
@@ -7775,7 +7755,8 @@ class DataFrame(NDFrame):
         if isinstance(level, str):
             level = count_axis._get_level_number(level)
 
-        level_index = count_axis.levels[level]
+        level_name = count_axis._names[level]
+        level_index = count_axis.levels[level]._shallow_copy(name=level_name)
         level_codes = ensure_int64(count_axis.codes[level])
         counts = lib.count_level_2d(mask, level_codes, len(level_index), axis=0)
 
@@ -7802,20 +7783,9 @@ class DataFrame(NDFrame):
         def f(x):
             return op(x, axis=axis, skipna=skipna, **kwds)
 
-        # exclude timedelta/datetime unless we are uniform types
-        if (
-            axis == 1
-            and self._is_datelike_mixed_type
-            and (
-                not self._is_homogeneous_type
-                and not is_datetime64tz_dtype(self.dtypes[0])
-            )
-        ):
-            numeric_only = True
-
         if numeric_only is None:
+            values = self.values
             try:
-                values = self.values
                 result = f(values)
 
                 if filter_type == "bool" and is_object_dtype(values) and axis is None:
@@ -7827,27 +7797,23 @@ class DataFrame(NDFrame):
 
                 # try by-column first
                 if filter_type is None and axis == 0:
-                    try:
+                    # this can end up with a non-reduction
+                    # but not always. if the types are mixed
+                    # with datelike then need to make sure a series
 
-                        # this can end up with a non-reduction
-                        # but not always. if the types are mixed
-                        # with datelike then need to make sure a series
+                    # we only end up here if we have not specified
+                    # numeric_only and yet we have tried a
+                    # column-by-column reduction, where we have mixed type.
+                    # So let's just do what we can
+                    from pandas.core.apply import frame_apply
 
-                        # we only end up here if we have not specified
-                        # numeric_only and yet we have tried a
-                        # column-by-column reduction, where we have mixed type.
-                        # So let's just do what we can
-                        from pandas.core.apply import frame_apply
-
-                        opa = frame_apply(
-                            self, func=f, result_type="expand", ignore_failures=True
-                        )
-                        result = opa.get_result()
-                        if result.ndim == self.ndim:
-                            result = result.iloc[0]
-                        return result
-                    except Exception:
-                        pass
+                    opa = frame_apply(
+                        self, func=f, result_type="expand", ignore_failures=True
+                    )
+                    result = opa.get_result()
+                    if result.ndim == self.ndim:
+                        result = result.iloc[0]
+                    return result
 
                 if filter_type is None or filter_type == "numeric":
                     data = self._get_numeric_data()
@@ -7948,7 +7914,7 @@ class DataFrame(NDFrame):
         ----------
         axis : {0 or 'index', 1 or 'columns'}, default 0
             The axis to use. 0 or 'index' for row-wise, 1 or 'columns' for column-wise
-        skipna : boolean, default True
+        skipna : bool, default True
             Exclude NA/null values. If an entire row/column is NA, the result
             will be NA.
 
@@ -7985,7 +7951,7 @@ class DataFrame(NDFrame):
         ----------
         axis : {0 or 'index', 1 or 'columns'}, default 0
             The axis to use. 0 or 'index' for row-wise, 1 or 'columns' for column-wise
-        skipna : boolean, default True
+        skipna : bool, default True
             Exclude NA/null values. If an entire row/column is NA, the result
             will be NA.
 
@@ -8037,7 +8003,8 @@ class DataFrame(NDFrame):
             The axis to iterate over while searching for the mode:
 
             * 0 or 'index' : get mode of each column
-            * 1 or 'columns' : get mode of each row
+            * 1 or 'columns' : get mode of each row.
+
         numeric_only : bool, default False
             If True, only apply to numeric columns.
         dropna : bool, default True
@@ -8176,7 +8143,7 @@ class DataFrame(NDFrame):
         C        1 days 12:00:00
         Name: 0.5, dtype: object
         """
-        self._check_percentile(q)
+        validate_percentile(q)
 
         data = self._get_numeric_data() if numeric_only else self
         axis = self._get_axis_number(axis)
