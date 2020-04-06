@@ -132,10 +132,10 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
       if: github.event_name == 'push'
 
-    - name: Sync web with OVH
+    - name: Sync web with server
       run: rsync -az -nv --delete --exclude=pandas-docs/** web/build/ ${{ secrets.server_user }}@${{ secrets.server_host }}:/usr/share/nginx/pandas_rsync
       if: github.event_name == 'push'
 
-    - name: Sync dev docs with OVH
+    - name: Sync dev docs with server
       run: rsync -az -nv --delete doc/build/html/ ${{ secrets.server_user }}@${{ secrets.server_host }}:/usr/share/nginx/pandas_rsync/pandas-docs/dev
       if: github.event_name == 'push'
