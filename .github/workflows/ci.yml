@@ -130,13 +130,13 @@ jobs:
         mkdir -m 700 -p ~/.ssh
         echo "${{ secrets.server_ssh_key }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        echo "${{ secrets.server_host }} ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE1Kkopomm7FHG5enATf7SgnpICZ4W2bw+Ho+afqin+w7sMcrsa0je7sbztFAV8YchDkiBKnWTG4cRT+KZgZCaY=" > ~/.ssh/known_hosts
+        echo "${{ secrets.server_ip }} ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE1Kkopomm7FHG5enATf7SgnpICZ4W2bw+Ho+afqin+w7sMcrsa0je7sbztFAV8YchDkiBKnWTG4cRT+KZgZCaY=" > ~/.ssh/known_hosts
       if: github.event_name == 'push'
 
     - name: Sync web with server
-      run: rsync -az -nv --delete --exclude=pandas-docs/** web/build/ ${{ secrets.server_user }}@${{ secrets.server_host }}:/usr/share/nginx/pandas_rsync
+      run: rsync -az --delete --exclude='pandas-docs' --exclude='Pandas_Cheat_Sheet_*' web/build/ docs@${{ secrets.server_ip }}:/usr/share/nginx/pandas_rsync
       if: github.event_name == 'push'
 
     - name: Sync dev docs with server
-      run: rsync -az -nv --delete doc/build/html/ ${{ secrets.server_user }}@${{ secrets.server_host }}:/usr/share/nginx/pandas_rsync/pandas-docs/dev
+      run: rsync -az --delete doc/build/html/ docs@${{ secrets.server_ip }}:/usr/share/nginx/pandas_rsync/pandas-docs/dev
       if: github.event_name == 'push'
