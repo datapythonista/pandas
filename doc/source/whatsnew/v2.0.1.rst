@@ -1,7 +1,7 @@
 .. _whatsnew_201:
 
-What's new in 2.0.1 (May XX, 2023)
-----------------------------------
+What's new in 2.0.1 (April 24, 2023)
+------------------------------------
 
 These are the changes in pandas 2.0.1. See :ref:`release` for a full changelog
 including other versions of pandas.
